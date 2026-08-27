@@ -1,53 +1,51 @@
-// ============================================================
-// SATU AMAL INDONESIA
-// NTT RESPONSE COMMAND CENTER
-// Dashboard Donasi
-// ============================================================
-
 const API_URL =
   'https://script.google.com/macros/s/AKfycbwJaC5W0DzvLGdGarehlu1MzpSWJeWh77CfxBWnAEQsXrwqx3jnn0KnlpEwOU_y6lc8iA/exec';
 
-const IDR = new Intl.NumberFormat('id-ID', {
-  style: 'currency',
-  currency: 'IDR',
-  maximumFractionDigits: 0
-});
+const IDR =
+  new Intl.NumberFormat('id-ID', {
+    style: 'currency',
+    currency: 'IDR',
+    maximumFractionDigits: 0
+  });
 
 const charts = {};
 
 
-// ============================================================
-// FORMAT
-// ============================================================
-
 function money(n) {
-  return IDR.format(Number(n) || 0);
+
+  return IDR.format(
+    Number(n) || 0
+  );
+
 }
 
 
 function shortMoney(n) {
+
   n = Number(n) || 0;
 
-  if (n >= 1000000000) {
-    return 'Rp' +
-      (n / 1000000000)
+  if (n >= 1e9) {
+
+    return (
+      'Rp' +
+      (n / 1e9)
         .toFixed(2)
         .replace('.', ',') +
-      ' M';
+      ' M'
+    );
+
   }
 
-  if (n >= 1000000) {
-    return 'Rp' +
-      (n / 1000000)
+  if (n >= 1e6) {
+
+    return (
+      'Rp' +
+      (n / 1e6)
         .toFixed(1)
         .replace('.', ',') +
-      ' Jt';
-  }
+      ' Jt'
+    );
 
-  if (n >= 1000) {
-    return 'Rp' +
-      Math.round(n / 1000) +
-      ' Rb';
   }
 
   return money(n);
@@ -55,158 +53,83 @@ function shortMoney(n) {
 
 
 function pct(n) {
+
   n = Number(n) || 0;
 
   return (
     (n * 100)
-      .toFixed(n * 100 % 1 ? 1 : 0)
+      .toFixed(
+        (n * 100) % 1 ? 1 : 0
+      )
       .replace('.', ',') +
     '%'
   );
+
 }
 
 
 function esc(s) {
-  return String(s ?? '').replace(
-    /[&<>"']/g,
-    function (m) {
-      return {
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#039;'
-      }[m];
-    }
-  );
+
+  return String(s ?? '')
+    .replace(
+      /[&<>"']/g,
+      function(m) {
+
+        return {
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#039;'
+        }[m];
+
+      }
+    );
+
 }
 
 
-// ============================================================
-// STATUS
-// ============================================================
-
-function setStatus(ok, text) {
-
-  const dot = document.getElementById('statusDot');
-  const statusText = document.getElementById('statusText');
-
-  if (dot) {
-
-    if (ok === true) {
-      dot.style.background = '#222';
-    }
-
-    else if (ok === false) {
-      dot.style.background = '#b42318';
-    }
-
-    else {
-      dot.style.background = '#999';
-    }
-  }
-
-  if (statusText) {
-    statusText.textContent = text;
-  }
-}
-
-
-// ============================================================
-// LOAD DATA
-// ============================================================
+/* =====================================
+   LOAD DATA DENGAN JSONP
+===================================== */
 
 function load() {
 
-  setStatus(null, 'Menghubungkan ke Google Sheets...');
+  setStatus(
+    null,
+    'Menghubungkan ke Google Sheets...'
+  );
+
 
   const callbackName =
     'satuAmalCallback_' +
     Date.now();
 
-  let finished = false;
-
-  const script =
-    document.createElement('script');
-
-  const timeout =
-    setTimeout(function () {
-
-      if (finished) return;
-
-      finished = true;
-
-      cleanup();
-
-      setStatus(
-        false,
-        'Gagal terhubung ke Google Sheets'
-      );
-
-    }, 20000);
-
-
-  function cleanup() {
-
-    clearTimeout(timeout);
-
-    if (script.parentNode) {
-      script.parentNode.removeChild(script);
-    }
-
-    try {
-      delete window[callbackName];
-    }
-
-    catch (e) {
-      window[callbackName] = undefined;
-    }
-  }
-
 
   window[callbackName] =
-    function (data) {
-
-      if (finished) return;
-
-      finished = true;
-
-      cleanup();
-
-      console.log(
-        'DATA GOOGLE SHEETS:',
-        data
-      );
-
-      if (!data || data.ok !== true) {
-
-        console.error(
-          'API mengembalikan data tidak valid:',
-          data
-        );
-
-        setStatus(
-          false,
-          'Data Google Sheets tidak valid'
-        );
-
-        return;
-      }
-
+    function(data) {
 
       try {
 
+        if (!data || !data.ok) {
+
+          throw new Error(
+            data?.error ||
+            'API mengembalikan error'
+          );
+
+        }
+
+
         render(data);
 
-        const generated =
-          data.generatedAt
-            ? new Date(data.generatedAt)
-            : new Date();
 
         setStatus(
           true,
           'Live • ' +
-          generated.toLocaleTimeString(
+          new Date(
+            data.generatedAt
+          ).toLocaleTimeString(
             'id-ID',
             {
               hour: '2-digit',
@@ -216,388 +139,364 @@ function load() {
           )
         );
 
+
       }
 
       catch (error) {
 
         console.error(
-          'Render error:',
+          'Dashboard error:',
           error
         );
 
         setStatus(
           false,
-          'Data berhasil diterima, tetapi gagal ditampilkan'
+          'Gagal memuat data'
         );
+
       }
-    };
 
-
-  script.onerror =
-    function () {
-
-      if (finished) return;
-
-      finished = true;
 
       cleanup();
 
+    };
+
+
+  const script =
+    document.createElement('script');
+
+
+  const separator =
+    API_URL.includes('?')
+      ? '&'
+      : '?';
+
+
+  script.src =
+    API_URL +
+    separator +
+    'callback=' +
+    callbackName +
+    '&t=' +
+    Date.now();
+
+
+  script.onerror =
+    function() {
+
       console.error(
-        'JSONP gagal dimuat dari Apps Script.'
+        'Google Apps Script tidak dapat diakses.'
       );
 
       setStatus(
         false,
         'Gagal terhubung ke Google Sheets'
       );
+
+      cleanup();
+
     };
 
 
-  // ==========================================================
-  // INI BAGIAN PENTING
-  // Google Apps Script menggunakan parameter "prefix"
-  // ==========================================================
-
-  script.src =
-    API_URL +
-    '?prefix=' +
-    encodeURIComponent(callbackName) +
-    '&t=' +
-    Date.now();
+  document.body.appendChild(
+    script
+  );
 
 
-  document.head.appendChild(script);
+  function cleanup() {
+
+    try {
+
+      script.remove();
+
+    }
+
+    catch (e) {}
+
+
+    try {
+
+      delete window[callbackName];
+
+    }
+
+    catch (e) {}
+
+  }
+
 }
 
 
-// ============================================================
-// RENDER
-// ============================================================
+/* =====================================
+   STATUS
+===================================== */
+
+function setStatus(
+  ok,
+  text
+) {
+
+  const dot =
+    document.getElementById(
+      'statusDot'
+    );
+
+  const statusText =
+    document.getElementById(
+      'statusText'
+    );
+
+
+  if (dot) {
+
+    dot.style.background =
+      ok === true
+        ? '#222'
+        : ok === false
+          ? '#b42318'
+          : '#999';
+
+  }
+
+
+  if (statusText) {
+
+    statusText.textContent =
+      text;
+
+  }
+
+}
+
+
+/* =====================================
+   RENDER
+===================================== */
 
 function render(d) {
 
-  const s = d.summary || {};
+  const s =
+    d.summary;
 
 
-  // TOTAL DONASI
-
-  const total =
-    document.getElementById('total');
-
-  if (total) {
-    total.textContent =
-      money(s.total);
-  }
+  document.getElementById(
+    'total'
+  ).textContent =
+    money(s.total);
 
 
-  // TRANSAKSI
-
-  const transactions =
-    document.getElementById('transactions');
-
-  if (transactions) {
-    transactions.textContent =
-      Number(
-        s.transactions || 0
-      ).toLocaleString('id-ID');
-  }
-
-
-  // DONATUR
-
-  const donors =
-    document.getElementById('donors');
-
-  if (donors) {
-    donors.textContent =
-      Number(
-        s.uniqueDonors || 0
-      ).toLocaleString('id-ID');
-  }
-
-
-  // DONASI HARI INI
-
-  const today =
-    document.getElementById('today');
-
-  if (today) {
-    today.textContent =
-      money(s.todayTotal);
-  }
-
-
-  // ==========================================================
-  // TARGET 1 PEKAN
-  // ==========================================================
-
-  const weeklyText =
-    document.getElementById(
-      'weeklyText'
+  document.getElementById(
+    'transactions'
+  ).textContent =
+    Number(
+      s.transactions || 0
+    ).toLocaleString(
+      'id-ID'
     );
 
-  if (weeklyText) {
-    weeklyText.textContent =
-      shortMoney(s.total) +
-      ' / Rp200 Juta';
-  }
 
-
-  const weeklyPct =
-    document.getElementById(
-      'weeklyPct'
+  document.getElementById(
+    'donors'
+  ).textContent =
+    Number(
+      s.uniqueDonors || 0
+    ).toLocaleString(
+      'id-ID'
     );
 
-  if (weeklyPct) {
-    weeklyPct.textContent =
-      pct(s.weeklyProgress);
-  }
 
-
-  const weeklyBar =
-    document.getElementById(
-      'weeklyBar'
+  document.getElementById(
+    'today'
+  ).textContent =
+    money(
+      s.todayTotal
     );
 
-  if (weeklyBar) {
 
-    weeklyBar.style.width =
-      Math.min(
-        Number(
-          s.weeklyProgress || 0
-        ) * 100,
-        100
-      ) + '%';
-  }
+  /* TARGET MINGGUAN */
+
+  document.getElementById(
+    'weeklyText'
+  ).textContent =
+    shortMoney(
+      s.total
+    ) +
+    ' / Rp200 Juta';
 
 
-  const weeklyRemaining =
-    document.getElementById(
-      'weeklyRemaining'
+  document.getElementById(
+    'weeklyPct'
+  ).textContent =
+    pct(
+      s.weeklyProgress
     );
 
-  if (weeklyRemaining) {
 
-    weeklyRemaining.textContent =
-      Number(
-        s.weeklyRemaining || 0
-      ) > 0
-
-        ? 'Sisa ' +
-          money(
-            s.weeklyRemaining
-          )
-
-        : 'Target tercapai';
-  }
+  document.getElementById(
+    'weeklyBar'
+  ).style.width =
+    Math.min(
+      s.weeklyProgress * 100,
+      100
+    ) +
+    '%';
 
 
-  // ==========================================================
-  // TARGET 1 MILIAR
-  // ==========================================================
+  document.getElementById(
+    'weeklyRemaining'
+  ).textContent =
+    s.weeklyRemaining > 0
+      ? 'Sisa ' +
+        money(
+          s.weeklyRemaining
+        )
+      : 'Target tercapai';
 
-  const overallText =
-    document.getElementById(
-      'overallText'
+
+  /* TARGET OVERALL */
+
+  document.getElementById(
+    'overallText'
+  ).textContent =
+    shortMoney(
+      s.total
+    ) +
+    ' / Rp1 Miliar';
+
+
+  document.getElementById(
+    'overallPct'
+  ).textContent =
+    pct(
+      s.overallProgress
     );
 
-  if (overallText) {
 
-    overallText.textContent =
-      shortMoney(s.total) +
-      ' / Rp1 Miliar';
-  }
-
-
-  const overallPct =
-    document.getElementById(
-      'overallPct'
-    );
-
-  if (overallPct) {
-
-    overallPct.textContent =
-      pct(s.overallProgress);
-  }
+  document.getElementById(
+    'overallBar'
+  ).style.width =
+    Math.min(
+      s.overallProgress * 100,
+      100
+    ) +
+    '%';
 
 
-  const overallBar =
-    document.getElementById(
-      'overallBar'
-    );
-
-  if (overallBar) {
-
-    overallBar.style.width =
-      Math.min(
-        Number(
-          s.overallProgress || 0
-        ) * 100,
-        100
-      ) + '%';
-  }
+  document.getElementById(
+    'overallRemaining'
+  ).textContent =
+    s.overallRemaining > 0
+      ? 'Sisa ' +
+        money(
+          s.overallRemaining
+        )
+      : 'Target tercapai';
 
 
-  const overallRemaining =
-    document.getElementById(
-      'overallRemaining'
-    );
+  /* CHART */
 
-  if (overallRemaining) {
-
-    overallRemaining.textContent =
-      Number(
-        s.overallRemaining || 0
-      ) > 0
-
-        ? 'Sisa ' +
-          money(
-            s.overallRemaining
-          )
-
-        : 'Target tercapai';
-  }
+  renderChart(
+    'reffChart',
+    'bar',
+    (d.byReff || [])
+      .slice()
+      .reverse(),
+    'Kanal'
+  );
 
 
-  // ==========================================================
-  // CHART
-  // ==========================================================
-
-  if (
-    Array.isArray(d.byReff)
-  ) {
-
-    renderChart(
-      'reffChart',
-      'bar',
-      d.byReff
-        .slice()
-        .reverse(),
-      'Kanal'
-    );
-  }
+  renderChart(
+    'jenisChart',
+    'doughnut',
+    d.byJenis || [],
+    'Jenis'
+  );
 
 
-  if (
-    Array.isArray(d.byJenis)
-  ) {
-
-    renderChart(
-      'jenisChart',
-      'doughnut',
-      d.byJenis,
-      'Jenis'
-    );
-  }
+  renderChart(
+    'dateChart',
+    'line',
+    (d.byDate || [])
+      .slice()
+      .reverse(),
+    'Tanggal'
+  );
 
 
-  if (
-    Array.isArray(d.byDate)
-  ) {
-
-    renderChart(
-      'dateChart',
-      'line',
-      d.byDate
-        .slice()
-        .reverse(),
-      'Tanggal'
-    );
-  }
-
-
-  // ==========================================================
-  // TABEL DONASI TERBARU
-  // ==========================================================
+  /* TRANSAKSI TERBARU */
 
   const recent =
     document.getElementById(
       'recent'
     );
 
-  if (
-    recent &&
-    Array.isArray(d.recent)
-  ) {
 
-    recent.innerHTML =
-      d.recent
-        .map(function (r) {
+  recent.innerHTML =
+    (d.recent || [])
+      .map(function(r) {
 
-          return `
-            <tr>
+        return `
+          <tr>
+            <td>
+              ${esc(
+                (r.tanggal || '') +
+                ' ' +
+                (r.waktu || '')
+              )}
+            </td>
 
-              <td>
-                ${esc(
-                  (r.tanggal || '') +
-                  ' ' +
-                  (r.waktu || '')
-                )}
-              </td>
+            <td>
+              ${esc(r.nama)}
+            </td>
 
-              <td>
-                ${esc(
-                  r.nama || ''
-                )}
-              </td>
+            <td>
+              <b>
+                ${money(r.nominal)}
+              </b>
+            </td>
 
-              <td>
-                <b>
-                  ${money(
-                    r.nominal
-                  )}
-                </b>
-              </td>
+            <td>
+              ${esc(r.reff)}
+            </td>
 
-              <td>
-                ${esc(
-                  r.reff || ''
-                )}
-              </td>
+            <td>
+              ${esc(r.jenis)}
+            </td>
 
-              <td>
-                ${esc(
-                  r.jenis || ''
-                )}
-              </td>
+            <td>
+              ${esc(r.pic)}
+            </td>
+          </tr>
+        `;
 
-              <td>
-                ${esc(
-                  r.pic || ''
-                )}
-              </td>
+      })
+      .join('');
 
-            </tr>
-          `;
-        })
-        .join('');
-  }
-
-
-  // ==========================================================
-  // UPDATE TIME
-  // ==========================================================
 
   const updated =
     document.getElementById(
       'updated'
     );
 
+
   if (updated) {
 
     updated.textContent =
       'Update: ' +
       new Date(
-        d.generatedAt ||
-        Date.now()
-      ).toLocaleString('id-ID');
+        d.generatedAt
+      ).toLocaleString(
+        'id-ID'
+      );
+
   }
+
 }
 
 
-// ============================================================
-// CHART
-// ============================================================
+/* =====================================
+   CHART
+===================================== */
 
 function renderChart(
   id,
@@ -609,6 +508,7 @@ function renderChart(
   const canvas =
     document.getElementById(id);
 
+
   if (!canvas) {
     return;
   }
@@ -616,15 +516,16 @@ function renderChart(
 
   if (charts[id]) {
 
-    try {
-      charts[id].destroy();
-    }
+    charts[id].destroy();
 
-    catch (e) {}
   }
 
 
-  const options = {
+  const isDate =
+    id === 'dateChart';
+
+
+  const opts = {
 
     responsive: true,
 
@@ -633,32 +534,17 @@ function renderChart(
     plugins: {
 
       legend: {
+
         display:
           type === 'doughnut'
-      },
 
-      tooltip: {
-
-        callbacks: {
-
-          label:
-            function (context) {
-
-              return money(
-                context.raw
-              );
-            }
-        }
       }
+
     },
 
-
     scales:
-
       type === 'doughnut'
-
         ? {}
-
         : {
 
             y: {
@@ -668,30 +554,47 @@ function renderChart(
               ticks: {
 
                 callback:
-                  function (value) {
+                  function(v) {
 
-                    return shortMoney(
-                      value
-                    );
+                    return shortMoney(v);
+
                   }
+
               }
+
             },
 
             x: {
 
               ticks: {
 
-                maxRotation: 0,
+                maxRotation: 0
 
-                autoSkip: true
               }
+
             }
+
           }
+
   };
 
 
-  canvas.style.height =
-    '280px';
+  const parent =
+    canvas.parentElement;
+
+
+  const chartCanvas =
+    parent.querySelector(
+      'canvas'
+    );
+
+
+  if (chartCanvas) {
+
+    chartCanvas.style.height =
+      '280px';
+
+  }
 
 
   charts[id] =
@@ -705,7 +608,7 @@ function renderChart(
 
           labels:
             items.map(
-              function (x) {
+              function(x) {
                 return x.label;
               }
             ),
@@ -719,29 +622,32 @@ function renderChart(
 
               data:
                 items.map(
-                  function (x) {
-                    return Number(
-                      x.nominal
-                    ) || 0;
+                  function(x) {
+                    return x.nominal;
                   }
                 ),
 
               borderWidth: 2,
 
               tension: 0.25
+
             }
+
           ]
+
         },
 
-        options: options
+        options: opts
+
       }
     );
+
 }
 
 
-// ============================================================
-// BUTTON REFRESH
-// ============================================================
+/* =====================================
+   REFRESH
+===================================== */
 
 const refreshBtn =
   document.getElementById(
@@ -753,27 +659,16 @@ if (refreshBtn) {
 
   refreshBtn.addEventListener(
     'click',
-    function () {
-      load();
-    }
+    load
   );
+
 }
 
-
-// ============================================================
-// LOAD PERTAMA
-// ============================================================
 
 load();
 
 
-// ============================================================
-// AUTO REFRESH 60 DETIK
-// ============================================================
-
 setInterval(
-  function () {
-    load();
-  },
+  load,
   60000
 );
