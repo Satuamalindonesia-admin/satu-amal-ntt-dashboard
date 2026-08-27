@@ -93,7 +93,104 @@ function esc(s) {
    LOAD DATA DENGAN JSONP
 ===================================== */
 
-function load() {
+function load(){
+
+  if(API_URL.includes('PASTE_')){
+    setStatus(false,'API belum dipasang');
+    return;
+  }
+
+  setStatus(null,'Memuat data...');
+
+  const callbackName =
+    'dashboardCallback_' +
+    Date.now();
+
+  const script =
+    document.createElement('script');
+
+  let finished = false;
+
+  window[callbackName] = function(data){
+
+    finished = true;
+
+    try{
+
+      if(!data || !data.ok){
+        throw new Error(
+          data?.error ||
+          'API mengembalikan error'
+        );
+      }
+
+      render(data);
+
+      setStatus(
+        true,
+        'Live • ' +
+        new Date(
+          data.generatedAt
+        ).toLocaleTimeString(
+          'id-ID',
+          {
+            hour:'2-digit',
+            minute:'2-digit',
+            second:'2-digit'
+          }
+        )
+      );
+
+    }catch(e){
+
+      console.error(e);
+
+      setStatus(
+        false,
+        'Gagal memuat data'
+      );
+
+    }finally{
+
+      delete window[callbackName];
+
+      if(script.parentNode){
+        script.parentNode.removeChild(script);
+      }
+    }
+  };
+
+  script.onerror = function(){
+
+    if(finished) return;
+
+    finished = true;
+
+    delete window[callbackName];
+
+    if(script.parentNode){
+      script.parentNode.removeChild(script);
+    }
+
+    console.error(
+      'Gagal mengakses Google Apps Script'
+    );
+
+    setStatus(
+      false,
+      'Gagal terhubung ke Google Sheets'
+    );
+  };
+
+  script.src =
+    API_URL +
+    '?callback=' +
+    encodeURIComponent(callbackName) +
+    '&t=' +
+    Date.now();
+
+  document.body.appendChild(script);
+}
 
   setStatus(
     null,
