@@ -1,185 +1,136 @@
 const API_URL =
-  'https://script.google.com/macros/s/AKfycbwJaC5W0DzvLGdGarehlu1MzpSWJeWh77CfxBWnAEQsXrwqx3jnn0KnlpEwOU_y6lc8iA/exec';
+  'https://script.google.com/macros/s/AKfycbwJaC5W0DzvLGGarehlu1MzpSWJeWh77CfxBWnAEQsXrwqx3jnn0KnlpEwOU_y6lc8iA/exec';
 
-const IDR =
-  new Intl.NumberFormat('id-ID', {
-    style: 'currency',
-    currency: 'IDR',
-    maximumFractionDigits: 0
-  });
+const IDR = new Intl.NumberFormat('id-ID', {
+  style: 'currency',
+  currency: 'IDR',
+  maximumFractionDigits: 0
+});
 
 const charts = {};
 
-
 function money(n) {
-
-  return IDR.format(
-    Number(n) || 0
-  );
-
+  return IDR.format(Number(n) || 0);
 }
 
-
 function shortMoney(n) {
-
   n = Number(n) || 0;
 
   if (n >= 1e9) {
-
-    return (
-      'Rp' +
-      (n / 1e9)
-        .toFixed(2)
-        .replace('.', ',') +
-      ' M'
-    );
-
+    return 'Rp' + (n / 1e9).toFixed(2).replace('.', ',') + ' M';
   }
 
   if (n >= 1e6) {
-
-    return (
-      'Rp' +
-      (n / 1e6)
-        .toFixed(1)
-        .replace('.', ',') +
-      ' Jt'
-    );
-
+    return 'Rp' + (n / 1e6).toFixed(1).replace('.', ',') + ' Jt';
   }
 
   return money(n);
 }
 
-
 function pct(n) {
-
   n = Number(n) || 0;
 
   return (
     (n * 100)
-      .toFixed(
-        (n * 100) % 1 ? 1 : 0
-      )
-      .replace('.', ',') +
-    '%'
+      .toFixed((n * 100) % 1 ? 1 : 0)
+      .replace('.', ',') + '%'
   );
-
 }
-
 
 function esc(s) {
-
-  return String(s ?? '')
-    .replace(
-      /[&<>"']/g,
-      function(m) {
-
-        return {
-          '&': '&amp;',
-          '<': '&lt;',
-          '>': '&gt;',
-          '"': '&quot;',
-          "'": '&#039;'
-        }[m];
-
-      }
-    );
-
+  return String(s ?? '').replace(
+    /[&<>"']/g,
+    function (m) {
+      return {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+      }[m];
+    }
+  );
 }
 
-
 /* =====================================
-   LOAD DATA DENGAN JSONP
+   LOAD DATA GOOGLE SHEETS - JSONP
 ===================================== */
 
-function load(){
+function load() {
 
-  if(API_URL.includes('PASTE_')){
-    setStatus(false,'API belum dipasang');
-    return;
-  }
-
-  setStatus(null,'Memuat data...');
+  setStatus(null, 'Menghubungkan ke Google Sheets...');
 
   const callbackName =
-    'dashboardCallback_' +
-    Date.now();
+    'satuAmalCallback_' + Date.now();
 
-  const script =
-    document.createElement('script');
+  const script = document.createElement('script');
 
   let finished = false;
 
-  window[callbackName] = function(data){
+  window[callbackName] = function (data) {
+
+    if (finished) return;
 
     finished = true;
 
-    try{
+    try {
 
-      if(!data || !data.ok){
+      if (!data || !data.ok) {
         throw new Error(
-          data?.error ||
-          'API mengembalikan error'
+          data?.error || 'API mengembalikan error'
         );
       }
+
+      console.log('DATA GOOGLE SHEETS:', data);
 
       render(data);
 
       setStatus(
         true,
-        'Live • ' +
-        new Date(
-          data.generatedAt
-        ).toLocaleTimeString(
-          'id-ID',
-          {
-            hour:'2-digit',
-            minute:'2-digit',
-            second:'2-digit'
-          }
-        )
+        'Terhubung • ' +
+          new Date(data.generatedAt).toLocaleTimeString(
+            'id-ID',
+            {
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit'
+            }
+          )
       );
 
-    }catch(e){
+    } catch (error) {
 
-      console.error(e);
+      console.error('Dashboard error:', error);
 
       setStatus(
         false,
         'Gagal memuat data'
       );
 
-    }finally{
+    } finally {
 
-      delete window[callbackName];
+      cleanup();
 
-      if(script.parentNode){
-        script.parentNode.removeChild(script);
-      }
     }
   };
 
-  script.onerror = function(){
+  script.onerror = function () {
 
-    if(finished) return;
+    if (finished) return;
 
     finished = true;
 
-    delete window[callbackName];
-
-    if(script.parentNode){
-      script.parentNode.removeChild(script);
-    }
-
     console.error(
-      'Gagal mengakses Google Apps Script'
+      'Google Apps Script tidak dapat diakses.'
     );
 
     setStatus(
       false,
       'Gagal terhubung ke Google Sheets'
     );
+
+    cleanup();
+
   };
 
   script.src =
@@ -190,159 +141,31 @@ function load(){
     Date.now();
 
   document.body.appendChild(script);
-}
-
-  setStatus(
-    null,
-    'Menghubungkan ke Google Sheets...'
-  );
-
-
-  const callbackName =
-    'satuAmalCallback_' +
-    Date.now();
-
-
-  window[callbackName] =
-    function(data) {
-
-      try {
-
-        if (!data || !data.ok) {
-
-          throw new Error(
-            data?.error ||
-            'API mengembalikan error'
-          );
-
-        }
-
-
-        render(data);
-
-
-        setStatus(
-          true,
-          'Live • ' +
-          new Date(
-            data.generatedAt
-          ).toLocaleTimeString(
-            'id-ID',
-            {
-              hour: '2-digit',
-              minute: '2-digit',
-              second: '2-digit'
-            }
-          )
-        );
-
-
-      }
-
-      catch (error) {
-
-        console.error(
-          'Dashboard error:',
-          error
-        );
-
-        setStatus(
-          false,
-          'Gagal memuat data'
-        );
-
-      }
-
-
-      cleanup();
-
-    };
-
-
-  const script =
-    document.createElement('script');
-
-
-  const separator =
-    API_URL.includes('?')
-      ? '&'
-      : '?';
-
-
-  script.src =
-    API_URL +
-    separator +
-    'callback=' +
-    callbackName +
-    '&t=' +
-    Date.now();
-
-
-  script.onerror =
-    function() {
-
-      console.error(
-        'Google Apps Script tidak dapat diakses.'
-      );
-
-      setStatus(
-        false,
-        'Gagal terhubung ke Google Sheets'
-      );
-
-      cleanup();
-
-    };
-
-
-  document.body.appendChild(
-    script
-  );
-
 
   function cleanup() {
 
     try {
-
-      script.remove();
-
-    }
-
-    catch (e) {}
-
+      delete window[callbackName];
+    } catch (e) {}
 
     try {
-
-      delete window[callbackName];
-
-    }
-
-    catch (e) {}
+      script.remove();
+    } catch (e) {}
 
   }
-
 }
-
 
 /* =====================================
    STATUS
 ===================================== */
 
-function setStatus(
-  ok,
-  text
-) {
+function setStatus(ok, text) {
 
   const dot =
-    document.getElementById(
-      'statusDot'
-    );
+    document.getElementById('statusDot');
 
   const statusText =
-    document.getElementById(
-      'statusText'
-    );
-
+    document.getElementById('statusText');
 
   if (dot) {
 
@@ -355,16 +178,10 @@ function setStatus(
 
   }
 
-
   if (statusText) {
-
-    statusText.textContent =
-      text;
-
+    statusText.textContent = text;
   }
-
 }
-
 
 /* =====================================
    RENDER
@@ -372,135 +189,60 @@ function setStatus(
 
 function render(d) {
 
-  const s =
-    d.summary;
+  const s = d.summary || {};
 
-
-  document.getElementById(
-    'total'
-  ).textContent =
+  document.getElementById('total').textContent =
     money(s.total);
 
+  document.getElementById('transactions').textContent =
+    Number(s.transaksi || 0).toLocaleString('id-ID');
 
-  document.getElementById(
-    'transactions'
-  ).textContent =
-    Number(
-      s.transactions || 0
-    ).toLocaleString(
-      'id-ID'
-    );
+  document.getElementById('donors').textContent =
+    Number(s.uniqueDonors || 0).toLocaleString('id-ID');
 
-
-  document.getElementById(
-    'donors'
-  ).textContent =
-    Number(
-      s.uniqueDonors || 0
-    ).toLocaleString(
-      'id-ID'
-    );
-
-
-  document.getElementById(
-    'today'
-  ).textContent =
-    money(
-      s.todayTotal
-    );
-
+  document.getElementById('today').textContent =
+    money(s.todayTotal);
 
   /* TARGET MINGGUAN */
 
-  document.getElementById(
-    'weeklyText'
-  ).textContent =
-    shortMoney(
-      s.total
-    ) +
-    ' / Rp200 Juta';
+  document.getElementById('weeklyText').textContent =
+    shortMoney(s.total) + ' / Rp200 Juta';
 
+  document.getElementById('weeklyPct').textContent =
+    pct(s.weeklyProgress);
 
-  document.getElementById(
-    'weeklyPct'
-  ).textContent =
-    pct(
-      s.weeklyProgress
-    );
+  document.getElementById('weeklyBar').style.width =
+    Math.min((s.weeklyProgress || 0) * 100, 100) + '%';
 
-
-  document.getElementById(
-    'weeklyBar'
-  ).style.width =
-    Math.min(
-      s.weeklyProgress * 100,
-      100
-    ) +
-    '%';
-
-
-  document.getElementById(
-    'weeklyRemaining'
-  ).textContent =
+  document.getElementById('weeklyRemaining').textContent =
     s.weeklyRemaining > 0
-      ? 'Sisa ' +
-        money(
-          s.weeklyRemaining
-        )
+      ? 'Sisa ' + money(s.weeklyRemaining)
       : 'Target tercapai';
-
 
   /* TARGET OVERALL */
 
-  document.getElementById(
-    'overallText'
-  ).textContent =
-    shortMoney(
-      s.total
-    ) +
-    ' / Rp1 Miliar';
+  document.getElementById('overallText').textContent =
+    shortMoney(s.total) + ' / Rp1 Miliar';
 
+  document.getElementById('overallPct').textContent =
+    pct(s.overallProgress);
 
-  document.getElementById(
-    'overallPct'
-  ).textContent =
-    pct(
-      s.overallProgress
-    );
+  document.getElementById('overallBar').style.width =
+    Math.min((s.overallProgress || 0) * 100, 100) + '%';
 
-
-  document.getElementById(
-    'overallBar'
-  ).style.width =
-    Math.min(
-      s.overallProgress * 100,
-      100
-    ) +
-    '%';
-
-
-  document.getElementById(
-    'overallRemaining'
-  ).textContent =
+  document.getElementById('overallRemaining').textContent =
     s.overallRemaining > 0
-      ? 'Sisa ' +
-        money(
-          s.overallRemaining
-        )
+      ? 'Sisa ' + money(s.overallRemaining)
       : 'Target tercapai';
-
 
   /* CHART */
 
   renderChart(
     'reffChart',
     'bar',
-    (d.byReff || [])
-      .slice()
-      .reverse(),
+    (d.byReff || []).slice().reverse(),
     'Kanal'
   );
-
 
   renderChart(
     'jenisChart',
@@ -509,118 +251,87 @@ function render(d) {
     'Jenis'
   );
 
-
   renderChart(
     'dateChart',
     'line',
-    (d.byDate || [])
-      .slice()
-      .reverse(),
+    (d.byDate || []).slice().reverse(),
     'Tanggal'
   );
-
 
   /* TRANSAKSI TERBARU */
 
   const recent =
-    document.getElementById(
-      'recent'
-    );
+    document.getElementById('recent');
 
+  if (recent) {
 
-  recent.innerHTML =
-    (d.recent || [])
-      .map(function(r) {
+    recent.innerHTML =
+      (d.recent || [])
+        .map(function (r) {
 
-        return `
-          <tr>
-            <td>
-              ${esc(
-                (r.tanggal || '') +
-                ' ' +
-                (r.waktu || '')
-              )}
-            </td>
+          return `
+            <tr>
+              <td>
+                ${esc(
+                  (r.tanggal || '') +
+                  ' ' +
+                  (r.waktu || '')
+                )}
+              </td>
 
-            <td>
-              ${esc(r.nama)}
-            </td>
+              <td>
+                ${esc(r.nama)}
+              </td>
 
-            <td>
-              <b>
-                ${money(r.nominal)}
-              </b>
-            </td>
+              <td>
+                <b>${money(r.nominal)}</b>
+              </td>
 
-            <td>
-              ${esc(r.reff)}
-            </td>
+              <td>
+                ${esc(r.reff)}
+              </td>
 
-            <td>
-              ${esc(r.jenis)}
-            </td>
+              <td>
+                ${esc(r.jenis)}
+              </td>
 
-            <td>
-              ${esc(r.pic)}
-            </td>
-          </tr>
-        `;
+              <td>
+                ${esc(r.pic)}
+              </td>
+            </tr>
+          `;
 
-      })
-      .join('');
+        })
+        .join('');
 
+  }
 
   const updated =
-    document.getElementById(
-      'updated'
-    );
-
+    document.getElementById('updated');
 
   if (updated) {
 
     updated.textContent =
       'Update: ' +
-      new Date(
-        d.generatedAt
-      ).toLocaleString(
-        'id-ID'
-      );
+      new Date(d.generatedAt).toLocaleString('id-ID');
 
   }
-
 }
-
 
 /* =====================================
    CHART
 ===================================== */
 
-function renderChart(
-  id,
-  type,
-  items,
-  label
-) {
+function renderChart(id, type, items, label) {
 
   const canvas =
     document.getElementById(id);
 
-
-  if (!canvas) {
-    return;
-  }
-
+  if (!canvas) return;
 
   if (charts[id]) {
-
     charts[id].destroy();
-
   }
-
-
-  const isDate =
-    id === 'dateChart';
-
 
   const opts = {
 
@@ -631,10 +342,7 @@ function renderChart(
     plugins: {
 
       legend: {
-
-        display:
-          type === 'doughnut'
-
+        display: type === 'doughnut'
       }
 
     },
@@ -650,12 +358,9 @@ function renderChart(
 
               ticks: {
 
-                callback:
-                  function(v) {
-
-                    return shortMoney(v);
-
-                  }
+                callback: function (v) {
+                  return shortMoney(v);
+                }
 
               }
 
@@ -664,9 +369,7 @@ function renderChart(
             x: {
 
               ticks: {
-
                 maxRotation: 0
-
               }
 
             }
@@ -675,82 +378,51 @@ function renderChart(
 
   };
 
-
-  const parent =
-    canvas.parentElement;
-
-
-  const chartCanvas =
-    parent.querySelector(
-      'canvas'
-    );
-
-
-  if (chartCanvas) {
-
-    chartCanvas.style.height =
-      '280px';
-
-  }
-
-
   charts[id] =
-    new Chart(
-      canvas,
-      {
+    new Chart(canvas, {
 
-        type: type,
+      type: type,
 
-        data: {
+      data: {
 
-          labels:
-            items.map(
-              function(x) {
-                return x.label;
-              }
-            ),
+        labels:
+          items.map(function (x) {
+            return x.label;
+          }),
 
-          datasets: [
+        datasets: [
 
-            {
+          {
 
-              label:
-                'Nominal',
+            label: 'Nominal',
 
-              data:
-                items.map(
-                  function(x) {
-                    return x.nominal;
-                  }
-                ),
+            data:
+              items.map(function (x) {
+                return x.nominal;
+              }),
 
-              borderWidth: 2,
+            borderWidth: 2,
 
-              tension: 0.25
+            tension: 0.25
 
-            }
+          }
 
-          ]
+        ]
 
-        },
+      },
 
-        options: opts
+      options: opts
 
-      }
-    );
+    });
 
 }
-
 
 /* =====================================
    REFRESH
 ===================================== */
 
 const refreshBtn =
-  document.getElementById(
-    'refreshBtn'
-  );
-
+  document.getElementById('refreshBtn');
 
 if (refreshBtn) {
 
@@ -761,9 +433,7 @@ if (refreshBtn) {
 
 }
 
-
 load();
-
 
 setInterval(
   load,
