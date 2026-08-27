@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Satu Amal Indonesia — NTT Response Command Center</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <main class="container">
+    <header class="header">
+      <div>
+        <div class="eyebrow">SATU AMAL INDONESIA</div>
+        <h1>NTT Response Command Center</h1>
+        <p>Dashboard Penghimpunan Donasi — Respons Gempa NTT</p>
+      </div>
+      <div class="status">
+        <span id="statusDot"></span>
+        <span id="statusText">Menghubungkan...</span>
+        <button id="refreshBtn">↻ Refresh</button>
+      </div>
+    </header>
+
+    <section class="cards">
+      <article class="card primary">
+        <span>Total Donasi</span>
+        <strong id="total">Rp0</strong>
+      </article>
+      <article class="card">
+        <span>Jumlah Transaksi</span>
+        <strong id="transactions">0</strong>
+      </article>
+      <article class="card">
+        <span>Jumlah Donatur</span>
+        <strong id="donors">0</strong>
+      </article>
+      <article class="card">
+        <span>Donasi Hari Ini</span>
+        <strong id="today">Rp0</strong>
+      </article>
+    </section>
+
+    <section class="targets">
+      <article class="target">
+        <div class="target-head">
+          <div>
+            <span>Target 1 Pekan</span>
+            <h2 id="weeklyText">Rp0 / Rp200 Juta</h2>
+          </div>
+          <b id="weeklyPct">0%</b>
+        </div>
+        <div class="progress"><div id="weeklyBar"></div></div>
+        <small id="weeklyRemaining">Sisa Rp200 Juta</small>
+      </article>
+
+      <article class="target">
+        <div class="target-head">
+          <div>
+            <span>Target Respons NTT — 2 Bulan</span>
+            <h2 id="overallText">Rp0 / Rp1 Miliar</h2>
+          </div>
+          <b id="overallPct">0%</b>
+        </div>
+        <div class="progress"><div id="overallBar"></div></div>
+        <small id="overallRemaining">Sisa Rp1 Miliar</small>
+      </article>
+    </section>
+
+    <section class="grid2">
+      <article class="panel">
+        <div class="panel-title"><h3>Donasi per Kanal</h3><span>Nominal & transaksi</span></div>
+        <canvas id="reffChart"></canvas>
+      </article>
+      <article class="panel">
+        <div class="panel-title"><h3>Donasi per Jenis</h3><span>Sumber penghimpunan</span></div>
+        <canvas id="jenisChart"></canvas>
+      </article>
+    </section>
+
+    <section class="panel">
+      <div class="panel-title"><h3>Tren Penghimpunan</h3><span>Donasi per hari</span></div>
+      <canvas id="dateChart"></canvas>
+    </section>
+
+    <section class="panel">
+      <div class="panel-title"><h3>Donasi Terbaru</h3><span>25 transaksi terakhir</span></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Waktu</th><th>Donatur</th><th>Nominal</th><th>Kanal</th><th>Jenis</th><th>PIC</th></tr>
+          </thead>
+          <tbody id="recent"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer>
+      <span>Data bersumber dari Google Sheets Satu Amal Indonesia.</span>
+      <span id="updated"></span>
+    </footer>
+  </main>
+  <script src="script.js"></script>
+</body>
+</html>
