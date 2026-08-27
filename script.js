@@ -1,9 +1,11 @@
 // ============================================================
 // SATU AMAL INDONESIA — NTT RESPONSE COMMAND CENTER
+// Dashboard Penghimpunan Donasi — Google Apps Script JSONP
 // ============================================================
 
+// URL Web App Google Apps Script
 const API_URL =
-  'https://script.google.com/macros/s/AKfycbwJaC5W0DzvLGGarehlu1MzpSWJeWh77CfxBWnAEQsXrwqx3jnn0KnlpEwOU_y6lc8iA/exec';
+  'https://script.google.com/macros/s/AKfycbwJaC5W0DzvLGdGarehlu1MzpSWJeWh77CfxBWnAEQsXrwqx3jnn0KnlpEwOU_y6lc8iA/exec';
 
 const IDR = new Intl.NumberFormat('id-ID', {
   style: 'currency',
@@ -13,9 +15,8 @@ const IDR = new Intl.NumberFormat('id-ID', {
 
 const charts = {};
 
-
 // ============================================================
-// FORMAT
+// FORMAT ANGKA
 // ============================================================
 
 function money(n) {
@@ -33,32 +34,34 @@ function shortMoney(n) {
     return 'Rp' + (n / 1e6).toFixed(1).replace('.', ',') + ' Jt';
   }
 
+  if (n >= 1e3) {
+    return 'Rp' + Math.round(n / 1e3) + ' Rb';
+  }
+
   return money(n);
 }
 
 function pct(n) {
   n = Number(n) || 0;
   return (n * 100)
-    .toFixed((n * 100) % 1 ? 1 : 0)
+    .toFixed(n * 100 % 1 ? 1 : 0)
     .replace('.', ',') + '%';
 }
 
 function esc(s) {
-  return String(s ?? '').replace(
-    /[&<>"']/g,
-    m => ({
+  return String(s ?? '').replace(/[&<>"']/g, function (m) {
+    return {
       '&': '&amp;',
       '<': '&lt;',
       '>': '&gt;',
       '"': '&quot;',
       "'": '&#039;'
-    }[m])
-  );
+    }[m];
+  });
 }
 
-
 // ============================================================
-// STATUS
+// STATUS DASHBOARD
 // ============================================================
 
 function setStatus(ok, text) {
@@ -67,9 +70,11 @@ function setStatus(ok, text) {
 
   if (dot) {
     dot.style.background =
-      ok === true ? '#222' :
-      ok === false ? '#b42318' :
-      '#999';
+      ok === true
+        ? '#222'
+        : ok === false
+        ? '#b42318'
+        : '#999';
   }
 
   if (statusText) {
@@ -77,75 +82,80 @@ function setStatus(ok, text) {
   }
 }
 
-
 // ============================================================
-// LOAD DATA VIA JSONP
+// LOAD DATA DENGAN JSONP
+// Tidak menggunakan fetch() agar tidak terkena masalah CORS
+// dari Google Apps Script.
 // ============================================================
-
-let jsonpCounter = 0;
 
 function load() {
+  if (API_URL.includes('PASTE_')) {
+    setStatus(false, 'API belum dipasang');
+    return;
+  }
 
-  setStatus(null, 'Menghubungkan...');
+  setStatus(null, 'Memuat data...');
 
   const callbackName =
-    'satuAmalCallback_' + Date.now() + '_' + (++jsonpCounter);
+    '__satuAmalDashboard_' + Date.now();
 
   const script = document.createElement('script');
 
-  window[callbackName] = function(data) {
+  const timeout = setTimeout(function () {
+    cleanup();
+    setStatus(false, 'Gagal memuat data');
+    console.error('Timeout: Google Apps Script tidak merespons.');
+  }, 15000);
 
-    try {
-
-      if (!data || !data.ok) {
-        throw new Error('API mengembalikan error');
-      }
-
-      render(data);
-
-      setStatus(
-        true,
-        'Live • ' +
-        new Date(data.generatedAt).toLocaleTimeString(
-          'id-ID',
-          {
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit'
-          }
-        )
-      );
-
-    } catch (error) {
-
-      console.error(error);
-      setStatus(false, 'Data API bermasalah');
-
-    } finally {
-
-      delete window[callbackName];
-
-      if (script.parentNode) {
-        script.parentNode.removeChild(script);
-      }
-
-    }
-  };
-
-  script.onerror = function() {
-
-    console.error('JSONP gagal dimuat');
-
-    setStatus(
-      false,
-      'Gagal terhubung ke Google Sheets'
-    );
-
-    delete window[callbackName];
+  function cleanup() {
+    clearTimeout(timeout);
 
     if (script.parentNode) {
       script.parentNode.removeChild(script);
     }
+
+    try {
+      delete window[callbackName];
+    } catch (e) {
+      window[callbackName] = undefined;
+    }
+  }
+
+  window[callbackName] = function (data) {
+    cleanup();
+
+    if (!data || data.ok !== true) {
+      console.error('API Error:', data);
+      setStatus(false, 'Gagal memuat data');
+      return;
+    }
+
+    try {
+      render(data);
+
+      const generated = data.generatedAt
+        ? new Date(data.generatedAt)
+        : new Date();
+
+      setStatus(
+        true,
+        'Live • ' +
+          generated.toLocaleTimeString('id-ID', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+          })
+      );
+    } catch (e) {
+      console.error('Render Error:', e);
+      setStatus(false, 'Gagal menampilkan data');
+    }
+  };
+
+  script.onerror = function () {
+    cleanup();
+    setStatus(false, 'Gagal terhubung ke Google Sheets');
+    console.error('Google Apps Script tidak dapat diakses.');
   };
 
   script.src =
@@ -155,264 +165,316 @@ function load() {
     '&t=' +
     Date.now();
 
-  document.body.appendChild(script);
+  document.head.appendChild(script);
 }
 
-
 // ============================================================
-// RENDER DASHBOARD
+// RENDER DATA UTAMA
 // ============================================================
 
 function render(d) {
-
   const s = d.summary || {};
 
   // ----------------------------------------------------------
-  // SUMMARY
+  // KARTU UTAMA
   // ----------------------------------------------------------
 
-  document.getElementById('total').textContent =
-    money(s.total);
+  const totalEl = document.getElementById('total');
+  const transactionsEl = document.getElementById('transactions');
+  const donorsEl = document.getElementById('donors');
+  const todayEl = document.getElementById('today');
 
-  document.getElementById('transactions').textContent =
-    Number(s.transactions || 0).toLocaleString('id-ID');
+  if (totalEl) {
+    totalEl.textContent = money(s.total);
+  }
 
-  document.getElementById('donors').textContent =
-    Number(s.uniqueDonors || 0).toLocaleString('id-ID');
+  if (transactionsEl) {
+    transactionsEl.textContent =
+      Number(s.transactions || 0).toLocaleString('id-ID');
+  }
 
-  document.getElementById('today').textContent =
-    money(s.todayTotal);
+  if (donorsEl) {
+    donorsEl.textContent =
+      Number(s.uniqueDonors || 0).toLocaleString('id-ID');
+  }
 
-
-  // ----------------------------------------------------------
-  // TARGET 1 MINGGU
-  // ----------------------------------------------------------
-
-  const weeklyProgress =
-    Number(s.weeklyProgress) || 0;
-
-  document.getElementById('weeklyText').textContent =
-    shortMoney(s.total) + ' / Rp200 Juta';
-
-  document.getElementById('weeklyPct').textContent =
-    pct(weeklyProgress);
-
-  document.getElementById('weeklyBar').style.width =
-    Math.min(weeklyProgress * 100, 100) + '%';
-
-  document.getElementById('weeklyRemaining').textContent =
-    Number(s.weeklyRemaining) > 0
-      ? 'Sisa ' + money(s.weeklyRemaining)
-      : 'Target tercapai';
-
+  if (todayEl) {
+    todayEl.textContent = money(s.todayTotal);
+  }
 
   // ----------------------------------------------------------
-  // TARGET 2 BULAN
+  // TARGET 1 PEKAN
   // ----------------------------------------------------------
 
-  const overallProgress =
-    Number(s.overallProgress) || 0;
+  const weeklyText = document.getElementById('weeklyText');
+  const weeklyPct = document.getElementById('weeklyPct');
+  const weeklyBar = document.getElementById('weeklyBar');
+  const weeklyRemaining =
+    document.getElementById('weeklyRemaining');
 
-  document.getElementById('overallText').textContent =
-    shortMoney(s.total) + ' / Rp1 Miliar';
+  if (weeklyText) {
+    weeklyText.textContent =
+      shortMoney(s.total) + ' / Rp200 Juta';
+  }
 
-  document.getElementById('overallPct').textContent =
-    pct(overallProgress);
+  if (weeklyPct) {
+    weeklyPct.textContent = pct(s.weeklyProgress);
+  }
 
-  document.getElementById('overallBar').style.width =
-    Math.min(overallProgress * 100, 100) + '%';
+  if (weeklyBar) {
+    weeklyBar.style.width =
+      Math.min(Number(s.weeklyProgress || 0) * 100, 100) + '%';
+  }
 
-  document.getElementById('overallRemaining').textContent =
-    Number(s.overallRemaining) > 0
-      ? 'Sisa ' + money(s.overallRemaining)
-      : 'Target tercapai';
+  if (weeklyRemaining) {
+    weeklyRemaining.textContent =
+      Number(s.weeklyRemaining || 0) > 0
+        ? 'Sisa ' + money(s.weeklyRemaining)
+        : 'Target tercapai';
+  }
 
+  // ----------------------------------------------------------
+  // TARGET RESPONS NTT — 2 BULAN
+  // ----------------------------------------------------------
+
+  const overallText = document.getElementById('overallText');
+  const overallPct = document.getElementById('overallPct');
+  const overallBar = document.getElementById('overallBar');
+  const overallRemaining =
+    document.getElementById('overallRemaining');
+
+  if (overallText) {
+    overallText.textContent =
+      shortMoney(s.total) + ' / Rp1 Miliar';
+  }
+
+  if (overallPct) {
+    overallPct.textContent = pct(s.overallProgress);
+  }
+
+  if (overallBar) {
+    overallBar.style.width =
+      Math.min(Number(s.overallProgress || 0) * 100, 100) + '%';
+  }
+
+  if (overallRemaining) {
+    overallRemaining.textContent =
+      Number(s.overallRemaining || 0) > 0
+        ? 'Sisa ' + money(s.overallRemaining)
+        : 'Target tercapai';
+  }
 
   // ----------------------------------------------------------
   // CHART
   // ----------------------------------------------------------
 
-  renderChart(
-    'reffChart',
-    'bar',
-    (d.byReff || []).slice().reverse()
-  );
+  if (Array.isArray(d.byReff)) {
+    renderChart(
+      'reffChart',
+      'bar',
+      d.byReff.slice().reverse(),
+      'Kanal'
+    );
+  }
 
-  renderChart(
-    'jenisChart',
-    'doughnut',
-    d.byJenis || []
-  );
+  if (Array.isArray(d.byJenis)) {
+    renderChart(
+      'jenisChart',
+      'doughnut',
+      d.byJenis,
+      'Jenis'
+    );
+  }
 
-  renderChart(
-    'dateChart',
-    'line',
-    (d.byDate || []).slice().reverse()
-  );
-
-
-  // ----------------------------------------------------------
-  // TRANSAKSI TERBARU
-  // ----------------------------------------------------------
-
-  const recent = d.recent || [];
-
-  document.getElementById('recent').innerHTML =
-    recent.map(r => `
-      <tr>
-        <td>
-          ${esc((r.tanggal || '') + ' ' + (r.waktu || ''))}
-        </td>
-
-        <td>
-          ${esc(r.nama || '')}
-        </td>
-
-        <td>
-          <b>${money(r.nominal)}</b>
-        </td>
-
-        <td>
-          ${esc(r.reff || '')}
-        </td>
-
-        <td>
-          ${esc(r.jenis || '')}
-        </td>
-
-        <td>
-          ${esc(r.pic || '')}
-        </td>
-      </tr>
-    `).join('');
-
+  if (Array.isArray(d.byDate)) {
+    renderChart(
+      'dateChart',
+      'line',
+      d.byDate.slice().reverse(),
+      'Tanggal'
+    );
+  }
 
   // ----------------------------------------------------------
-  // UPDATE TIME
+  // TABEL DONASI TERBARU
   // ----------------------------------------------------------
 
-  document.getElementById('updated').textContent =
-    'Update: ' +
-    new Date(d.generatedAt).toLocaleString('id-ID');
+  const recentEl = document.getElementById('recent');
+
+  if (recentEl && Array.isArray(d.recent)) {
+    recentEl.innerHTML = d.recent
+      .map(function (r) {
+        return `
+          <tr>
+            <td>
+              ${esc(
+                (r.tanggal || '') +
+                ' ' +
+                (r.waktu || '')
+              )}
+            </td>
+
+            <td>
+              ${esc(r.nama || '')}
+            </td>
+
+            <td>
+              <b>${money(r.nominal)}</b>
+            </td>
+
+            <td>
+              ${esc(r.reff || '')}
+            </td>
+
+            <td>
+              ${esc(r.jenis || '')}
+            </td>
+
+            <td>
+              ${esc(r.pic || '')}
+            </td>
+          </tr>
+        `;
+      })
+      .join('');
+  }
+
+  // ----------------------------------------------------------
+  // WAKTU UPDATE
+  // ----------------------------------------------------------
+
+  const updatedEl = document.getElementById('updated');
+
+  if (updatedEl) {
+    updatedEl.textContent =
+      'Update: ' +
+      new Date(
+        d.generatedAt || Date.now()
+      ).toLocaleString('id-ID');
+  }
 }
-
 
 // ============================================================
 // CHART
 // ============================================================
 
-function renderChart(id, type, items) {
-
+function renderChart(id, type, items, label) {
   const canvas = document.getElementById(id);
 
-  if (!canvas) return;
-
-  if (charts[id]) {
-    charts[id].destroy();
+  if (!canvas) {
+    console.warn('Canvas tidak ditemukan:', id);
+    return;
   }
 
-  const isDoughnut =
-    type === 'doughnut';
+  // Hapus chart lama
+  if (charts[id]) {
+    try {
+      charts[id].destroy();
+    } catch (e) {
+      console.warn('Gagal destroy chart:', id, e);
+    }
+  }
 
-  charts[id] = new Chart(canvas, {
+  const isDate = id === 'dateChart';
 
-    type: type,
+  const opts = {
+    responsive: true,
+    maintainAspectRatio: false,
 
-    data: {
-
-      labels: items.map(x => x.label),
-
-      datasets: [{
-
-        label: 'Nominal',
-
-        data: items.map(x =>
-          Number(x.nominal) || 0
-        ),
-
-        borderWidth: 2,
-
-        tension: 0.25
-
-      }]
-
-    },
-
-    options: {
-
-      responsive: true,
-
-      maintainAspectRatio: false,
-
-      plugins: {
-
-        legend: {
-          display: isDoughnut
-        }
-
+    plugins: {
+      legend: {
+        display: type === 'doughnut'
       },
 
-      scales: isDoughnut
+      tooltip: {
+        callbacks: {
+          label: function (context) {
+            return money(context.raw);
+          }
+        }
+      }
+    },
+
+    scales:
+      type === 'doughnut'
         ? {}
         : {
-
             y: {
-
               beginAtZero: true,
 
               ticks: {
-
-                callback: function(value) {
-                  return shortMoney(value);
+                callback: function (v) {
+                  return shortMoney(v);
                 }
-
               }
-
             },
 
             x: {
-
               ticks: {
-                maxRotation: 0
+                maxRotation: 0,
+                autoSkip: true
               }
-
             }
-
           }
+  };
 
-    }
+  // Tinggi chart
+  const parent = canvas.parentElement;
 
+  if (parent) {
+    canvas.style.height = isDate
+      ? '280px'
+      : '280px';
+  }
+
+  charts[id] = new Chart(canvas, {
+    type: type,
+
+    data: {
+      labels: items.map(function (x) {
+        return x.label;
+      }),
+
+      datasets: [
+        {
+          label: 'Nominal',
+
+          data: items.map(function (x) {
+            return Number(x.nominal) || 0;
+          }),
+
+          borderWidth: 2,
+          tension: 0.25
+        }
+      ]
+    },
+
+    options: opts
   });
 }
-
 
 // ============================================================
 // REFRESH BUTTON
 // ============================================================
 
-const refreshBtn =
-  document.getElementById('refreshBtn');
+const refreshBtn = document.getElementById('refreshBtn');
 
 if (refreshBtn) {
-  refreshBtn.addEventListener(
-    'click',
-    load
-  );
+  refreshBtn.addEventListener('click', function () {
+    load();
+  });
 }
 
-
 // ============================================================
-// INITIAL LOAD
+// LOAD PERTAMA
 // ============================================================
 
 load();
 
-
 // ============================================================
-// AUTO REFRESH 60 DETIK
+// AUTO REFRESH SETIAP 60 DETIK
 // ============================================================
 
-setInterval(
-  load,
-  60000
-);
+setInterval(function () {
+  load();
+}, 60000);
