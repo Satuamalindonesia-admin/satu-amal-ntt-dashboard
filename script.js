@@ -37,7 +37,7 @@ function setStatus(ok,text){
 function render(d){
   const s=d.summary;
   document.getElementById('total').textContent=money(s.total);
-  document.getElementById('transactions').textContent=s.transactions.toLocaleString('id-ID');
+  document.getElementById('transactions').textContent=s.transaksi.toLocaleString('id-ID');
   document.getElementById('donors').textContent=s.uniqueDonors.toLocaleString('id-ID');
   document.getElementById('today').textContent=money(s.todayTotal);
 
